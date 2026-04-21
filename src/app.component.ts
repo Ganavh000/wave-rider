@@ -22,7 +22,7 @@ interface Wave {
   crestThickness: number; // The dangerous part of the wave
 }
 
-type GameState = 'menu' | 'playing' | 'gameOver';
+type GameState = 'menu' | 'playing' | 'paused' | 'gameOver';
 
 @Component({
   selector: 'app-root',
@@ -36,6 +36,7 @@ export class AppComponent implements OnInit {
   gameState = signal<GameState>('menu');
   score = signal(0);
   highScore = signal(0);
+  private scoreAccumulator = 0;
   
   // Player State
   player = signal<Player>({
@@ -54,6 +55,8 @@ export class AppComponent implements OnInit {
   private waveSpawnTimer = 0;
 
   private pressedKeys = new Set<string>();
+  leftPressed = signal(false);
+  rightPressed = signal(false);
 
   constructor() {
     effect(() => {
@@ -79,6 +82,17 @@ export class AppComponent implements OnInit {
 
   @HostListener('window:keydown', ['$event'])
   handleKeyDown(event: KeyboardEvent) {
+    if (event.key === 'p' || event.key === 'P' || event.key === ' ') {
+      event.preventDefault();
+      this.togglePause();
+      return;
+    }
+
+    if ((this.gameState() === 'gameOver' || this.gameState() === 'paused') && (event.key === 'r' || event.key === 'R')) {
+      this.startGame();
+      return;
+    }
+
     if (this.gameState() !== 'playing') return;
     this.pressedKeys.add(event.key);
   }
@@ -93,11 +107,35 @@ export class AppComponent implements OnInit {
     this.gameState.set('playing');
   }
 
+  togglePause() {
+    if (this.gameState() === 'playing') {
+      this.gameState.set('paused');
+      return;
+    }
+
+    if (this.gameState() === 'paused') {
+      this.lastTimestamp = performance.now();
+      this.gameState.set('playing');
+    }
+  }
+
+  setMobileDirection(direction: 'left' | 'right', pressed: boolean) {
+    if (direction === 'left') {
+      this.leftPressed.set(pressed);
+      return;
+    }
+    this.rightPressed.set(pressed);
+  }
+
   resetGame() {
     this.score.set(0);
+    this.scoreAccumulator = 0;
     this.player.set({ ...this.player(), x: 47.5 });
     this.waves.set([]);
     this.waveSpawnTimer = 1500; // Start with a delay for the first wave
+    this.pressedKeys.clear();
+    this.leftPressed.set(false);
+    this.rightPressed.set(false);
   }
 
   private gameLoop = (timestamp: number) => {
@@ -108,7 +146,7 @@ export class AppComponent implements OnInit {
     this.updateWaves(deltaTime);
     this.checkCollisions();
 
-    this.score.update(s => s + 1);
+    this.updateScore(deltaTime);
 
     this.gameLoopId = requestAnimationFrame(this.gameLoop);
   }
@@ -116,10 +154,10 @@ export class AppComponent implements OnInit {
   private updatePlayer(deltaTime: number) {
     this.player.update(p => {
       let newX = p.x;
-      if (this.pressedKeys.has('ArrowLeft') || this.pressedKeys.has('a')) {
+      if (this.pressedKeys.has('ArrowLeft') || this.pressedKeys.has('a') || this.pressedKeys.has('A') || this.leftPressed()) {
         newX -= p.speed * (deltaTime / 16);
       }
-      if (this.pressedKeys.has('ArrowRight') || this.pressedKeys.has('d')) {
+      if (this.pressedKeys.has('ArrowRight') || this.pressedKeys.has('d') || this.pressedKeys.has('D') || this.rightPressed()) {
         newX += p.speed * (deltaTime / 16);
       }
       // Clamp player position within screen bounds
@@ -168,6 +206,16 @@ export class AppComponent implements OnInit {
       crestThickness: 2, // 2% of the screen height
     };
     this.waves.update(waves => [...waves, newWave]);
+  }
+
+  private updateScore(deltaTime: number) {
+    this.scoreAccumulator += deltaTime;
+    const stepMs = 50;
+    if (this.scoreAccumulator >= stepMs) {
+      const points = Math.floor(this.scoreAccumulator / stepMs);
+      this.score.update(s => s + points);
+      this.scoreAccumulator -= points * stepMs;
+    }
   }
 
   private checkCollisions() {
