@@ -1,5 +1,5 @@
 
-import { Component, ChangeDetectionStrategy, signal, effect, HostListener, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, effect, HostListener, OnDestroy, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 interface Player {
@@ -31,7 +31,8 @@ type GameState = 'menu' | 'playing' | 'paused' | 'gameOver';
   standalone: true,
   imports: [CommonModule],
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
+  @ViewChild('gameArea') gameArea?: ElementRef<HTMLDivElement>;
   // Game State
   gameState = signal<GameState>('menu');
   score = signal(0);
@@ -41,7 +42,7 @@ export class AppComponent implements OnInit {
   // Player State
   player = signal<Player>({
     x: 47.5,
-    y: 85,
+    y: 79,
     width: 5,
     height: 5,
     speed: 0.8,
@@ -80,6 +81,21 @@ export class AppComponent implements OnInit {
     }
   }
 
+  ngOnDestroy() {
+    if (this.gameLoopId) {
+      cancelAnimationFrame(this.gameLoopId);
+      this.gameLoopId = null;
+    }
+  }
+
+  private normalizedKey(event: KeyboardEvent) {
+    return (event.key || '').toLowerCase();
+  }
+
+  private normalizedCode(event: KeyboardEvent) {
+    return (event.code || '').toLowerCase();
+  }
+
   @HostListener('window:keydown', ['$event'])
   handleKeyDown(event: KeyboardEvent) {
     if (event.key === 'p' || event.key === 'P' || event.key === ' ') {
@@ -94,17 +110,48 @@ export class AppComponent implements OnInit {
     }
 
     if (this.gameState() !== 'playing') return;
-    this.pressedKeys.add(event.key);
+    this.pressedKeys.add(key);
+    this.pressedCodes.add(code);
   }
 
   @HostListener('window:keyup', ['$event'])
   handleKeyUp(event: KeyboardEvent) {
-    this.pressedKeys.delete(event.key);
+    this.pressedKeys.delete(this.normalizedKey(event));
+    this.pressedCodes.delete(this.normalizedCode(event));
   }
 
   startGame() {
     this.resetGame();
     this.gameState.set('playing');
+    requestAnimationFrame(() => this.focusGameArea());
+  }
+
+  togglePause() {
+    if (this.gameState() === 'playing') {
+      this.gameState.set('paused');
+      return;
+    }
+
+    if (this.gameState() === 'paused') {
+      this.lastTimestamp = performance.now();
+      this.gameState.set('playing');
+    }
+  }
+
+  restartGame() {
+    this.startGame();
+  }
+
+  focusGameArea() {
+    this.gameArea?.nativeElement.focus();
+  }
+
+  setMobileDirection(direction: 'left' | 'right', pressed: boolean) {
+    if (direction === 'left') {
+      this.leftPressed.set(pressed);
+      return;
+    }
+    this.rightPressed.set(pressed);
   }
 
   togglePause() {
