@@ -1,5 +1,5 @@
 
-import { Component, ChangeDetectionStrategy, signal, effect, HostListener, OnInit } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, effect, HostListener, OnDestroy, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 interface Player {
@@ -22,7 +22,7 @@ interface Wave {
   crestThickness: number; // The dangerous part of the wave
 }
 
-type GameState = 'menu' | 'playing' | 'gameOver';
+type GameState = 'menu' | 'playing' | 'paused' | 'gameOver';
 
 @Component({
   selector: 'app-root',
@@ -31,16 +31,18 @@ type GameState = 'menu' | 'playing' | 'gameOver';
   standalone: true,
   imports: [CommonModule],
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
+  @ViewChild('gameArea') gameArea?: ElementRef<HTMLDivElement>;
   // Game State
   gameState = signal<GameState>('menu');
   score = signal(0);
   highScore = signal(0);
+  private scoreAccumulator = 0;
   
   // Player State
   player = signal<Player>({
     x: 47.5,
-    y: 85,
+    y: 79,
     width: 5,
     height: 5,
     speed: 0.8,
@@ -54,6 +56,9 @@ export class AppComponent implements OnInit {
   private waveSpawnTimer = 0;
 
   private pressedKeys = new Set<string>();
+  private pressedCodes = new Set<string>();
+  leftPressed = signal(false);
+  rightPressed = signal(false);
 
   constructor() {
     effect(() => {
@@ -77,27 +82,96 @@ export class AppComponent implements OnInit {
     }
   }
 
+  ngOnDestroy() {
+    if (this.gameLoopId) {
+      cancelAnimationFrame(this.gameLoopId);
+      this.gameLoopId = null;
+    }
+  }
+
+  private normalizedKey(event: KeyboardEvent) {
+    return (event.key || '').toLowerCase();
+  }
+
+  private normalizedCode(event: KeyboardEvent) {
+    return (event.code || '').toLowerCase();
+  }
+
   @HostListener('window:keydown', ['$event'])
   handleKeyDown(event: KeyboardEvent) {
+    const key = this.normalizedKey(event);
+    const code = this.normalizedCode(event);
+
+    if (code === 'arrowleft' || code === 'arrowright' || code === 'space' || key === 'a' || key === 'd') {
+      event.preventDefault();
+    }
+
+    if ((key === 'p' || code === 'space') && (this.gameState() === 'playing' || this.gameState() === 'paused')) {
+      event.preventDefault();
+      this.togglePause();
+      return;
+    }
+
+    if (key === 'r') {
+      this.restartGame();
+      return;
+    }
+
     if (this.gameState() !== 'playing') return;
-    this.pressedKeys.add(event.key);
+    this.pressedKeys.add(key);
+    this.pressedCodes.add(code);
   }
 
   @HostListener('window:keyup', ['$event'])
   handleKeyUp(event: KeyboardEvent) {
-    this.pressedKeys.delete(event.key);
+    this.pressedKeys.delete(this.normalizedKey(event));
+    this.pressedCodes.delete(this.normalizedCode(event));
   }
 
   startGame() {
     this.resetGame();
     this.gameState.set('playing');
+    requestAnimationFrame(() => this.focusGameArea());
+  }
+
+  togglePause() {
+    if (this.gameState() === 'playing') {
+      this.gameState.set('paused');
+      return;
+    }
+
+    if (this.gameState() === 'paused') {
+      this.lastTimestamp = performance.now();
+      this.gameState.set('playing');
+    }
+  }
+
+  restartGame() {
+    this.startGame();
+  }
+
+  focusGameArea() {
+    this.gameArea?.nativeElement.focus();
+  }
+
+  setMobileDirection(direction: 'left' | 'right', pressed: boolean) {
+    if (direction === 'left') {
+      this.leftPressed.set(pressed);
+      return;
+    }
+    this.rightPressed.set(pressed);
   }
 
   resetGame() {
     this.score.set(0);
+    this.scoreAccumulator = 0;
     this.player.set({ ...this.player(), x: 47.5 });
     this.waves.set([]);
     this.waveSpawnTimer = 1500; // Start with a delay for the first wave
+    this.pressedKeys.clear();
+    this.pressedCodes.clear();
+    this.leftPressed.set(false);
+    this.rightPressed.set(false);
   }
 
   private gameLoop = (timestamp: number) => {
@@ -108,7 +182,7 @@ export class AppComponent implements OnInit {
     this.updateWaves(deltaTime);
     this.checkCollisions();
 
-    this.score.update(s => s + 1);
+    this.updateScore(deltaTime);
 
     this.gameLoopId = requestAnimationFrame(this.gameLoop);
   }
@@ -116,10 +190,22 @@ export class AppComponent implements OnInit {
   private updatePlayer(deltaTime: number) {
     this.player.update(p => {
       let newX = p.x;
-      if (this.pressedKeys.has('ArrowLeft') || this.pressedKeys.has('a')) {
+      if (
+        this.pressedCodes.has('arrowleft') ||
+        this.pressedCodes.has('keya') ||
+        this.pressedKeys.has('arrowleft') ||
+        this.pressedKeys.has('a') ||
+        this.leftPressed()
+      ) {
         newX -= p.speed * (deltaTime / 16);
       }
-      if (this.pressedKeys.has('ArrowRight') || this.pressedKeys.has('d')) {
+      if (
+        this.pressedCodes.has('arrowright') ||
+        this.pressedCodes.has('keyd') ||
+        this.pressedKeys.has('arrowright') ||
+        this.pressedKeys.has('d') ||
+        this.rightPressed()
+      ) {
         newX += p.speed * (deltaTime / 16);
       }
       // Clamp player position within screen bounds
@@ -168,6 +254,16 @@ export class AppComponent implements OnInit {
       crestThickness: 2, // 2% of the screen height
     };
     this.waves.update(waves => [...waves, newWave]);
+  }
+
+  private updateScore(deltaTime: number) {
+    this.scoreAccumulator += deltaTime;
+    const stepMs = 50;
+    if (this.scoreAccumulator >= stepMs) {
+      const points = Math.floor(this.scoreAccumulator / stepMs);
+      this.score.update(s => s + points);
+      this.scoreAccumulator -= points * stepMs;
+    }
   }
 
   private checkCollisions() {

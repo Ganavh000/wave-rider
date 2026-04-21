@@ -8,7 +8,7 @@
         WAVE RIDER
       </h1>
       <p class="mt-4 text-lg text-cyan-100">Use Arrow Keys or A/D to dodge the waves.</p>
-      <p class="mt-1 text-base text-gray-400">Survive as long as you can.</p>
+      <p class="mt-1 text-base text-gray-400">Survive as long as you can. Press <span class="text-cyan-200">P</span> to pause.</p>
       <div class="mt-8">
         <button (click)="startGame()"
           class="bg-cyan-500 hover:bg-cyan-400 text-gray-900 font-bold py-3 px-12 rounded-lg text-xl tracking-wider transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-cyan-300">
@@ -35,8 +35,9 @@
   }
 
   <!-- Playing State -->
-  @if (gameState() === 'playing') {
-    <div class="w-full h-full max-w-4xl max-h-[700px] bg-sky-900 border-4 border-cyan-500/50 rounded-lg relative overflow-hidden shadow-2xl shadow-cyan-500/20">
+  @if (gameState() === 'playing' || gameState() === 'paused') {
+    <div #gameArea tabindex="0" (click)="focusGameArea()" class="w-full h-full max-w-4xl max-h-[700px] bg-sky-900 border-4 border-cyan-500/50 rounded-lg relative overflow-hidden shadow-2xl shadow-cyan-500/20 outline-none">
+      <div class="absolute left-0 right-0 bottom-0 h-[24%] bg-cyan-700/35 border-t-2 border-cyan-200/80 pointer-events-none"></div>
       
       <!-- Score Display -->
       <div class="absolute top-2 right-4 text-2xl text-white font-bold" style="text-shadow: 1px 1px 2px #000;">
@@ -44,6 +45,25 @@
       </div>
       <div class="absolute top-9 right-4 text-lg text-amber-300 font-bold" style="text-shadow: 1px 1px 2px #000;">
         High: {{ highScore() }}
+      </div>
+      <div class="absolute top-2 left-4 text-sm text-cyan-100/90 font-bold" style="text-shadow: 1px 1px 2px #000;">
+        P: pause/resume · R: restart
+      </div>
+      <div class="absolute left-0 right-0 bottom-0 h-[18%] bg-gradient-to-b from-cyan-500/20 to-cyan-900/80 pointer-events-none"></div>
+      <div class="absolute left-0 right-0 bottom-[18%] h-[2px] bg-cyan-200/70 pointer-events-none"></div>
+      <div class="absolute top-2 left-1/2 -translate-x-1/2 flex gap-2">
+        <button
+          (click)="togglePause()"
+          class="bg-cyan-500/90 hover:bg-cyan-300 text-slate-950 text-xs font-bold py-1.5 px-3 rounded-md"
+        >
+          {{ gameState() === 'paused' ? 'RESUME' : 'PAUSE' }}
+        </button>
+        <button
+          (click)="restartGame()"
+          class="bg-amber-400/90 hover:bg-amber-300 text-slate-950 text-xs font-bold py-1.5 px-3 rounded-md"
+        >
+          RESTART
+        </button>
       </div>
 
       <!-- Player Boat -->
@@ -70,6 +90,40 @@
             </svg>
         </div>
       }
+
+      @if (gameState() === 'paused') {
+        <div class="absolute inset-0 bg-black/60 flex items-center justify-center">
+          <div class="text-center">
+            <h2 class="text-5xl font-bold text-cyan-200">PAUSED</h2>
+            <p class="mt-3 text-cyan-100">Press P to continue</p>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="mt-4 flex gap-3">
+      <button
+        class="bg-cyan-500/90 active:bg-cyan-300 text-slate-950 font-bold py-3 px-6 rounded-lg select-none"
+        (mousedown)="setMobileDirection('left', true)"
+        (mouseup)="setMobileDirection('left', false)"
+        (mouseleave)="setMobileDirection('left', false)"
+        (touchstart)="setMobileDirection('left', true)"
+        (touchend)="setMobileDirection('left', false)"
+        (touchcancel)="setMobileDirection('left', false)"
+      >
+        ◀ LEFT
+      </button>
+      <button
+        class="bg-cyan-500/90 active:bg-cyan-300 text-slate-950 font-bold py-3 px-6 rounded-lg select-none"
+        (mousedown)="setMobileDirection('right', true)"
+        (mouseup)="setMobileDirection('right', false)"
+        (mouseleave)="setMobileDirection('right', false)"
+        (touchstart)="setMobileDirection('right', true)"
+        (touchend)="setMobileDirection('right', false)"
+        (touchcancel)="setMobileDirection('right', false)"
+      >
+        RIGHT ▶
+      </button>
     </div>
   }
 
