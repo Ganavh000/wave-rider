@@ -1,0 +1,13 @@
+
+
+import { bootstrapApplication } from '@angular/platform-browser';
+import { provideZonelessChangeDetection } from '@angular/core';
+import './index.css';
+
+import { AppComponent } from './src/app.component';
+
+bootstrapApplication(AppComponent, {
+  providers: [provideZonelessChangeDetection()],
+});
+
+// AI Studio always uses an `index.tsx` file for all project types.

@@ -1,0 +1,76 @@
+
+<main class="w-full h-screen flex flex-col items-center justify-center text-white font-mono select-none p-4">
+
+  <!-- Menu State -->
+  @if (gameState() === 'menu') {
+    <div class="text-center bg-black bg-opacity-30 p-8 rounded-xl backdrop-blur-sm animate-fade-in">
+      <h1 class="text-6xl md:text-8xl font-bold text-cyan-300 tracking-widest" style="text-shadow: 0 0 10px #22d3ee, 0 0 20px #22d3ee;">
+        WAVE RIDER
+      </h1>
+      <p class="mt-4 text-lg text-cyan-100">Use Arrow Keys or A/D to dodge the waves.</p>
+      <p class="mt-1 text-base text-gray-400">Survive as long as you can.</p>
+      <div class="mt-8">
+        <button (click)="startGame()"
+          class="bg-cyan-500 hover:bg-cyan-400 text-gray-900 font-bold py-3 px-12 rounded-lg text-xl tracking-wider transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-cyan-300">
+          START GAME
+        </button>
+      </div>
+      <p class="mt-8 text-lg text-amber-300">High Score: {{ highScore() }}</p>
+    </div>
+  }
+
+  <!-- Game Over State -->
+  @if (gameState() === 'gameOver') {
+    <div class="text-center bg-black bg-opacity-30 p-8 rounded-xl backdrop-blur-sm animate-fade-in">
+      <h2 class="text-6xl font-bold text-red-500">GAME OVER</h2>
+      <p class="mt-4 text-3xl text-white">Your Score: {{ score() }}</p>
+      <p class="mt-2 text-xl text-amber-300">High Score: {{ highScore() }}</p>
+      <div class="mt-8">
+        <button (click)="startGame()"
+          class="bg-cyan-500 hover:bg-cyan-400 text-gray-900 font-bold py-3 px-10 rounded-lg text-xl tracking-wider transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-cyan-300">
+          PLAY AGAIN
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Playing State -->
+  @if (gameState() === 'playing') {
+    <div class="w-full h-full max-w-4xl max-h-[700px] bg-sky-900 border-4 border-cyan-500/50 rounded-lg relative overflow-hidden shadow-2xl shadow-cyan-500/20">
+      
+      <!-- Score Display -->
+      <div class="absolute top-2 right-4 text-2xl text-white font-bold" style="text-shadow: 1px 1px 2px #000;">
+        Score: {{ score() }}
+      </div>
+      <div class="absolute top-9 right-4 text-lg text-amber-300 font-bold" style="text-shadow: 1px 1px 2px #000;">
+        High: {{ highScore() }}
+      </div>
+
+      <!-- Player Boat -->
+      <div class="absolute transition-transform duration-100" [style.left.%]="player().x" [style.top.%]="player().y" [style.width.%]="player().width" [style.height.%]="player().height">
+        <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-lg">
+          <path d="M5 80 C -10 40, 110 40, 95 80 L 75 95 L 25 95 Z" fill="#a16207"/> <!-- Hull -->
+          <path d="M50 80 L 50 10 L 55 10 L 55 80 Z" fill="#78350f" /> <!-- Mast -->
+          <path d="M55 15 C 85 35, 85 55, 55 75 Z" fill="#fef08a" /> <!-- Sail -->
+        </svg>
+      </div>
+
+      <!-- Waves -->
+      @for (wave of waves(); track wave.id) {
+        <div class="absolute" [style.left.%]="wave.x" [style.top.%]="wave.y" [style.width.%]="wave.width" [style.height.%]="wave.height * 4">
+            <svg class="w-full h-full" [attr.viewBox]="'0 0 ' + wave.width + ' ' + (wave.height * 4)">
+                <defs>
+                    <linearGradient [id]="'grad' + wave.id" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style="stop-color:#67e8f9; stop-opacity:1" />
+                        <stop offset="20%" style="stop-color:#22d3ee; stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#0891b2; stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                <path [attr.d]="generateWavePath(wave)" [attr.fill]="'url(#grad' + wave.id + ')'" />
+            </svg>
+        </div>
+      }
+    </div>
+  }
+
+</main>
