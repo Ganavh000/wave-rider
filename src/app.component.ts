@@ -56,7 +56,6 @@ export class AppComponent implements OnInit, OnDestroy {
   private waveSpawnTimer = 0;
 
   private pressedKeys = new Set<string>();
-  private pressedCodes = new Set<string>();
   leftPressed = signal(false);
   rightPressed = signal(false);
 
@@ -99,21 +98,14 @@ export class AppComponent implements OnInit, OnDestroy {
 
   @HostListener('window:keydown', ['$event'])
   handleKeyDown(event: KeyboardEvent) {
-    const key = this.normalizedKey(event);
-    const code = this.normalizedCode(event);
-
-    if (code === 'arrowleft' || code === 'arrowright' || code === 'space' || key === 'a' || key === 'd') {
-      event.preventDefault();
-    }
-
-    if ((key === 'p' || code === 'space') && (this.gameState() === 'playing' || this.gameState() === 'paused')) {
+    if (event.key === 'p' || event.key === 'P' || event.key === ' ') {
       event.preventDefault();
       this.togglePause();
       return;
     }
 
-    if (key === 'r') {
-      this.restartGame();
+    if ((this.gameState() === 'gameOver' || this.gameState() === 'paused') && (event.key === 'r' || event.key === 'R')) {
+      this.startGame();
       return;
     }
 
@@ -162,6 +154,26 @@ export class AppComponent implements OnInit, OnDestroy {
     this.rightPressed.set(pressed);
   }
 
+  togglePause() {
+    if (this.gameState() === 'playing') {
+      this.gameState.set('paused');
+      return;
+    }
+
+    if (this.gameState() === 'paused') {
+      this.lastTimestamp = performance.now();
+      this.gameState.set('playing');
+    }
+  }
+
+  setMobileDirection(direction: 'left' | 'right', pressed: boolean) {
+    if (direction === 'left') {
+      this.leftPressed.set(pressed);
+      return;
+    }
+    this.rightPressed.set(pressed);
+  }
+
   resetGame() {
     this.score.set(0);
     this.scoreAccumulator = 0;
@@ -169,7 +181,6 @@ export class AppComponent implements OnInit, OnDestroy {
     this.waves.set([]);
     this.waveSpawnTimer = 1500; // Start with a delay for the first wave
     this.pressedKeys.clear();
-    this.pressedCodes.clear();
     this.leftPressed.set(false);
     this.rightPressed.set(false);
   }
@@ -190,22 +201,10 @@ export class AppComponent implements OnInit, OnDestroy {
   private updatePlayer(deltaTime: number) {
     this.player.update(p => {
       let newX = p.x;
-      if (
-        this.pressedCodes.has('arrowleft') ||
-        this.pressedCodes.has('keya') ||
-        this.pressedKeys.has('arrowleft') ||
-        this.pressedKeys.has('a') ||
-        this.leftPressed()
-      ) {
+      if (this.pressedKeys.has('ArrowLeft') || this.pressedKeys.has('a') || this.pressedKeys.has('A') || this.leftPressed()) {
         newX -= p.speed * (deltaTime / 16);
       }
-      if (
-        this.pressedCodes.has('arrowright') ||
-        this.pressedCodes.has('keyd') ||
-        this.pressedKeys.has('arrowright') ||
-        this.pressedKeys.has('d') ||
-        this.rightPressed()
-      ) {
+      if (this.pressedKeys.has('ArrowRight') || this.pressedKeys.has('d') || this.pressedKeys.has('D') || this.rightPressed()) {
         newX += p.speed * (deltaTime / 16);
       }
       // Clamp player position within screen bounds
